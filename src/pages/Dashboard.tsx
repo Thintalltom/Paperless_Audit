@@ -1,20 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../components/auth/AuthContextSupabase';
+import { useAppSelector } from '../store/hooks';
 import { supabase } from '../supabaseClient';
 import { PlusIcon, CheckCircleIcon, XCircleIcon, ClockIcon, EyeIcon, FilterIcon } from 'lucide-react';
+interface ApprovalAction {
+  approver_id: string;
+  comments: string;
+  status: string;
+  timestamp: string;
+}
+
+interface Request {
+  id: number;
+  created_at: string;
+  created_by: string;
+  status: string;
+  supplier_name: string;
+  amount: number;
+  description: string;
+  initiator_name: string;
+  current_approval_level: number;
+  approval_status: { [key: number]: ApprovalAction };
+  approval_history: string[];
+  attachment: string | null;
+}
 const Dashboard = () => {
-  const { user } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState(user?.role === 'approver' ? 'pending' : null);
-  const [requests, setRequests] = useState([]);
+  const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch requests from database
   useEffect(() => {
     const fetchRequests = async () => {
+      if (!user) return;
+      
       try {
         let query = supabase.from('Request_table').select('*');
+        
+        // Filter by user role
+        if (user.role === 'initiator') {
+          // Initiators only see their own requests
+          query = query.eq('created_by', user.id);
+        }
+        // Approvers and finance see all requests (no additional filter needed)
         
         // Apply status filter if selected
         if (statusFilter) {
@@ -26,6 +56,7 @@ const Dashboard = () => {
         if (error) {
           console.error('Error fetching requests:', error);
         } else {
+         
           setRequests(data || []);
         }
       } catch (err) {
@@ -36,8 +67,8 @@ const Dashboard = () => {
     };
 
     fetchRequests();
-  }, [statusFilter]);
-  const getStatusBadge = status => {
+  }, [statusFilter, user]);
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
         return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
@@ -61,7 +92,7 @@ const Dashboard = () => {
           </span>;
     }
   };
-  const formatDate = dateString => {
+  const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -70,14 +101,14 @@ const Dashboard = () => {
   };
   // Get the title based on role and filter
   const getDashboardTitle = () => {
-    if (user.role === 'initiator') {
+    if (user?.role === 'initiator') {
       return 'My Requests';
-    } else if (user.role === 'approver') {
+    } else if (user?.role === 'approver') {
       if (statusFilter) {
         return statusFilter === 'pending' ? 'Pending Approvals' : statusFilter === 'approved' ? 'Approved Requests' : statusFilter === 'declined' ? 'Declined Requests' : 'Requests On Hold';
       }
       return 'All Requests';
-    } else if (user.role === 'finance') {
+    } else if (user?.role === 'finance') {
       return statusFilter === 'approved' ? 'Payment Processing' : 'All Requests';
     }
     return 'Dashboard';
@@ -100,7 +131,7 @@ const Dashboard = () => {
               </select>
             </div>}
           {/* Create button for initiators */}
-          {user.role === 'initiator' && <button onClick={() => navigate('/create-request')} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center text-sm">
+          {user?.role === 'initiator' && <button onClick={() => navigate('/create-request')} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center text-sm">
               <PlusIcon className="h-4 w-4 mr-2" />
               New Request
             </button>}
@@ -108,9 +139,9 @@ const Dashboard = () => {
       </div>
       {requests?.length === 0 ? <div className="bg-white rounded-lg shadow p-8 text-center">
           <p className="text-gray-500">
-            {statusFilter ? `No ${statusFilter} requests found.` : user.role === 'approver' ? 'No requests to display.' : user.role === 'finance' ? 'No approved requests to process.' : 'You have not created any requests yet.'}
+            {statusFilter ? `No ${statusFilter} requests found.` : user?.role === 'approver' ? 'No requests to display.' : user?.role === 'finance' ? 'No approved requests to process.' : 'You have not created any requests yet.'}
           </p>
-          {user.role === 'initiator' && <button onClick={() => navigate('/create-request')} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center mx-auto text-sm">
+          {user?.role === 'initiator' && <button onClick={() => navigate('/create-request')} className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center mx-auto text-sm">
               <PlusIcon className="h-4 w-4 mr-2" />
               Create your first request
             </button>}
@@ -146,7 +177,7 @@ const Dashboard = () => {
                   </td>
                 </tr>
               ) : (
-                requests?.map(request => (
+                requests?.map((request: Request) => (
                   <tr key={request.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       #{request.id}
@@ -155,7 +186,7 @@ const Dashboard = () => {
                       {request.supplier_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${parseFloat(request.amount).toFixed(2)}
+                      ${request.amount.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(request.created_at)}

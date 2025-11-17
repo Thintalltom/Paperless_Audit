@@ -1,13 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../components/auth/AuthContextSupabase';
+import { useAppSelector } from '../store/hooks';
 import { supabase } from '../supabaseClient';
 import { ArrowLeftIcon, PaperclipIcon } from 'lucide-react';
 const CreateRequest = () => {
-  const {
-    user,
-    getApprovalChain
-  } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
+  
+  const getApprovalChain = async () => {
+    const APPROVAL_CHAIN = [
+      'branch_auditor', 'regional_manager', 'ho_admin', 'ho_auditor', 
+      'account_unit', 'dd_operations', 'dd_finance', 'ged'
+    ];
+    
+    const { data, error } = await supabase
+      .from('Approval_chain_table')
+      .select('*')
+      .in('role', APPROVAL_CHAIN);
+
+    if (error) return [];
+
+    return data.sort((a, b) => 
+      APPROVAL_CHAIN.indexOf(a.role) - APPROVAL_CHAIN.indexOf(b.role)
+    );
+  };
   const navigate = useNavigate();
   // Get the full approval chain
   const [approvalChain, setApprovalChain] = useState([]);

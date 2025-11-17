@@ -1,5 +1,6 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
-import { useAuth } from '../auth/AuthContextSupabase';
+import { useAppSelector } from '../../store/hooks';
+import { getUser, isApprover, getNextApproverInChain } from '../../utils/authUtils';
 import { toast } from 'sonner';
 const RequestContext = createContext(null);
 export const RequestProvider = ({
@@ -7,12 +8,7 @@ export const RequestProvider = ({
 }) => {
   const [requests, setRequests] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
-  const {
-    user,
-    getUser,
-    getNextApproverInChain,
-    isApprover
-  } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
   useEffect(() => {
     // Load saved requests and audit logs from localStorage
     const savedRequests = localStorage.getItem('requests');

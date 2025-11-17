@@ -1,32 +1,30 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContextSupabase';
+import { useAppSelector } from '../../store/hooks';
 import { HomeIcon, PlusCircleIcon, ClipboardListIcon } from 'lucide-react';
 const Sidebar = () => {
-  const {
-    user
-  } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
   const navItems = [{
     name: 'Dashboard',
     path: '/',
     icon: <HomeIcon className="h-5 w-5" />
   }];
   // Add role-specific navigation items
-  if (user.role === 'initiator') {
+  if (user?.role === 'initiator') {
     navItems.push({
       name: 'Create Request',
       path: '/create-request',
       icon: <PlusCircleIcon className="h-5 w-5" />
     });
   }
-  if (user.role === 'approver') {
+  if (user?.role === 'approver') {
     navItems.push({
       name: 'Pending Approvals',
       path: '/',
       icon: <ClipboardListIcon className="h-5 w-5" />
     });
   }
-  if (user.role === 'finance') {
+  if (user?.role === 'finance') {
     navItems.push({
       name: 'Payment Processing',
       path: '/',

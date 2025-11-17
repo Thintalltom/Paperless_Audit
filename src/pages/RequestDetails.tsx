@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../components/auth/AuthContextSupabase';
+import { useAppSelector } from '../store/hooks';
 import { supabase } from '../supabaseClient';
 import { CheckCircleIcon, XCircleIcon, ClockIcon, PaperclipIcon, UserIcon, CalendarIcon, ArrowLeftIcon, DownloadIcon, EditIcon, TrashIcon, AlertTriangleIcon, CheckIcon, XIcon, Clock9Icon } from 'lucide-react';
 const RequestDetails = () => {
   const { requestId } = useParams();
-  const { user, getApprovalChain } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
+  
+  const getApprovalChain = async () => {
+    const APPROVAL_CHAIN = [
+      'branch_auditor', 'regional_manager', 'ho_admin', 'ho_auditor', 
+      'account_unit', 'dd_operations', 'dd_finance', 'ged'
+    ];
+    
+    const { data, error } = await supabase
+      .from('Approval_chain_table')
+      .select('*')
+      .in('role', APPROVAL_CHAIN);
+
+    if (error) return [];
+
+    return data.sort((a, b) => 
+      APPROVAL_CHAIN.indexOf(a.role) - APPROVAL_CHAIN.indexOf(b.role)
+    );
+  };
   const navigate = useNavigate();
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -130,9 +148,9 @@ const RequestDetails = () => {
   // Initialize edit form data if not already set
   if (isEditing && Object.keys(editFormData).length === 0) {
     setEditFormData({
-      supplierName: request.supplier_name,
-      amount: request.amount,
-      description: request.description
+      supplierName: request?.supplier_name,
+      amount: request?.amount,
+      description: request?.description
     });
   }
 
@@ -157,9 +175,9 @@ const RequestDetails = () => {
         return;
       }
       
-      const currentLevel = request.current_approval_level || 0;
-      const approvalStatus = { ...request.approval_status };
-      const approvalHistory = [...(request.approval_history || [])];
+      const currentLevel = request?.current_approval_level || 0;
+      const approvalStatus = { ...request?.approval_status };
+      const approvalHistory = [...(request?.approval_history || [])];
       
       // Record the approval action
       approvalStatus[currentLevel] = {
@@ -171,13 +189,13 @@ const RequestDetails = () => {
       
       approvalHistory.push({
         level: currentLevel,
-        approver_id: user.id,
+        approver_id: user?.id,
         action,
         comments,
         timestamp: new Date().toISOString()
       });
       
-      let newStatus = request.status;
+      let newStatus = request?.status;
       let newLevel = currentLevel;
       
       if (action === 'declined') {
@@ -206,16 +224,16 @@ const RequestDetails = () => {
         .update(updateData)
         .eq('id', requestId);
         
-      // Also insert into approval_actions table
-      await supabase
-        .from('approval_actions')
-        .insert({
-          request_id: requestId,
-          approver_id: user.id,
-          approval_level: currentLevel,
-          action,
-          comments
-        });
+      // Also insert into approval_action table
+      // await supabase
+      //   .from('approval_action')
+      //   .insert({
+      //     request_id: requestId,
+      //     approver_id: user.id,
+      //     approval_level: currentLevel,
+      //     action,
+      //     comments
+      //   });
 
       if (error) {
         console.error('Error updating request:', error);
