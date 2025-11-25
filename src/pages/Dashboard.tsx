@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
 import { supabase } from '../supabaseClient';
 import { PlusIcon, CheckCircleIcon, XCircleIcon, ClockIcon, EyeIcon, FilterIcon } from 'lucide-react';
@@ -27,6 +27,7 @@ interface Request {
 const Dashboard = () => {
   const user = useAppSelector((state) => state.auth.user);
   const navigate = useNavigate();
+  const location = useLocation();
   const [statusFilter, setStatusFilter] = useState(user?.role === 'approver' ? 'pending' : null);
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +44,27 @@ const Dashboard = () => {
         if (user.role === 'initiator') {
           // Initiators only see their own requests
           query = query.eq('created_by', user.id);
+        } else if (user.role === 'branch-approver') {
+          // Branch-approvers only see requests assigned to them
+          query = query.eq('branch_approver_id', user.id);
+          
+          // Apply status filter if selected
+          if (statusFilter) {
+            query = query.eq('status', statusFilter);
+          }
+          
+          const { data, error } = await query.order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('Error fetching requests:', error);
+          } else {
+            setRequests(data || []);
+          }
+          
+          setLoading(false);
+          return;
         }
-        // Approvers and finance see all requests (no additional filter needed)
+        // Other approvers and finance see all requests (no additional filter needed)
         
         // Apply status filter if selected
         if (statusFilter) {
@@ -56,7 +76,6 @@ const Dashboard = () => {
         if (error) {
           console.error('Error fetching requests:', error);
         } else {
-         
           setRequests(data || []);
         }
       } catch (err) {
@@ -67,7 +86,7 @@ const Dashboard = () => {
     };
 
     fetchRequests();
-  }, [statusFilter, user]);
+  }, [statusFilter, user, location.state]);
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -186,7 +205,7 @@ const Dashboard = () => {
                       {request.supplier_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${request.amount.toFixed(2)}
+                      ₦{request.amount.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(request.created_at)}

@@ -1,7 +1,8 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { persistStore, persistReducer } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import authReducer from './authSlice';
+import {reducer as notificationsReducer} from 'reapop'
 
 const persistConfig = {
   key: 'auth',
@@ -11,14 +12,18 @@ const persistConfig = {
 
 const persistedAuthReducer = persistReducer(persistConfig, authReducer);
 
+const rootReducer = combineReducers({
+  auth: persistedAuthReducer,
+  notifications: notificationsReducer,
+});
+
 export const store = configureStore({
-  reducer: {
-    auth: persistedAuthReducer,
-  },
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredPaths: ['notifications'],
       },
     }),
 });

@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { supabase } from '../supabaseClient';
 import { ArrowLeftIcon, PaperclipIcon } from 'lucide-react';
+import { notify } from 'reapop';
 const CreateRequest = () => {
   const user = useAppSelector((state) => state.auth.user);
-  
+  const dispatch = useAppDispatch();
+
   const getApprovalChain = async () => {
     const APPROVAL_CHAIN = [
-      'branch_auditor', 'regional_manager', 'ho_admin', 'ho_auditor', 
-      'account_unit', 'dd_operations', 'dd_finance', 'ged'
+      'branch-approver', 'Admin',  'dd_operations',  'ho_auditor', 
+      'account_unit', 'dd_finance', 'ged'
     ];
     
     const { data, error } = await supabase
@@ -18,6 +20,23 @@ const CreateRequest = () => {
       .in('role', APPROVAL_CHAIN);
 
     if (error) return [];
+
+    // If user email exists, filter branch-approver by domain
+    if (user?.username) {
+      const userDomain = user.username.split('@')[1];
+    
+      const filtered = data.filter(approver => {
+        if (approver.role === 'branch-approver') {
+          const approverDomain = approver.username?.split('@')[1];
+          return approverDomain === userDomain;
+        }
+        return true;
+      });
+      
+      return filtered.sort((a, b) => 
+        APPROVAL_CHAIN.indexOf(a.role) - APPROVAL_CHAIN.indexOf(b.role)
+      );
+    }
 
     return data.sort((a, b) => 
       APPROVAL_CHAIN.indexOf(a.role) - APPROVAL_CHAIN.indexOf(b.role)
@@ -31,11 +50,11 @@ const CreateRequest = () => {
     const fetchApprovalChain = async () => {
       // console.log('Fetching approval chain...');
       const chain = await getApprovalChain();
-      // console.log('Approval chain result:', chain);
+      //  console.log('Approval chain result:', chain);
       setApprovalChain(chain);
     };
     fetchApprovalChain();
-  }, []);
+  }, [user?.email]);
   
   // console.log('Current approval chain state:', approvalChain);
   const [formData, setFormData] = useState({
@@ -163,10 +182,14 @@ const CreateRequest = () => {
             name: file.name,
             size: file.size,
             type: file.type,
-            content: file.content
+            content: file?.content
           })))
         : null;
 
+      // Get the assigned branch-approver for this request
+      const chain = await getApprovalChain();
+      const branchApprover = chain.find(approver => approver.role === 'branch-approver');
+      console.log('the branch approver', branchApprover)
       // Request data with approval system initialization
       const requestData = {
         initiator_name: formData.initiatorName,
@@ -178,7 +201,9 @@ const CreateRequest = () => {
         created_by: user?.id,
         current_approval_level: 0, // Start at level 0 (first approver)
         approval_status: {}, // Track each level's status
-        approval_history: [] // Track all approval actions
+        approval_history: [], // Track all approval actions
+        account_name: user?.username,
+        branch_approver_id: branchApprover?.id // Store assigned branch-approver ID
       };
       
       // console.log('=== Request data to insert:', requestData);
@@ -193,12 +218,27 @@ const CreateRequest = () => {
       
       if (error) {
         // console.error('Error creating request:', error);
-        alert(`Error: ${error.message}`);
+        dispatch(notify({
+          title: 'Error',
+          message: `Failed to create request: ${error.message}`,
+          status: 'error',
+          dismissible: true,
+          dismissAfter: 5000
+        }));
         setIsSubmitting(false);
         return;
       }
 
       // console.log('=== Request created successfully, clearing form and navigating...');
+      
+      // Show success notification
+      dispatch(notify({
+        title: 'Success',
+        message: 'Request created successfully!',
+        status: 'success',
+        dismissible: true,
+        dismissAfter: 3000
+      }));
       
       // Clear form data after successful submission
       setFormData({
@@ -238,8 +278,8 @@ const CreateRequest = () => {
                 Initiator Name*
               </label>
               <input type="text" id="initiatorName" name="initiatorName" value={formData.initiatorName} onChange={handleChange} className={`block w-full px-3 py-2 border ${errors.initiatorName ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm`} placeholder="Enter your name" />
-              {errors.initiatorName && <p className="mt-1 text-sm text-red-600">
-                  {errors.initiatorName}
+              {errors?.initiatorName && <p className="mt-1 text-sm text-red-600">
+                  {errors?.initiatorName}
                 </p>}
             </div>
             <div>
@@ -257,11 +297,11 @@ const CreateRequest = () => {
               </label>
               <div className="relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
+                  <span className="text-gray-500 sm:text-sm">₦</span>
                 </div>
                 <input type="number" step="0.01" id="amount" name="amount" value={formData.amount} onChange={handleChange} className={`block w-full pl-7 pr-12 py-2 border ${errors.amount ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'} rounded-md shadow-sm focus:outline-none focus:ring-1 sm:text-sm`} placeholder="0.00" />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">USD</span>
+                  <span className="text-gray-500 sm:text-sm">Naira</span>
                 </div>
               </div>
               {errors.amount && <p className="mt-1 text-sm text-red-600">{errors.amount}</p>}

@@ -12,9 +12,9 @@ import CreateRequest from './pages/CreateRequest';
 import RequestDetails from './pages/RequestDetails';
 import Layout from './components/layout/Layout';
 import { Toaster } from 'sonner';
-
+import NotificationsSystem, { atalhoTheme, dismissNotification } from 'reapop'
 // Protected route wrapper
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
   const user = useAppSelector((state) => state.auth.user);
   
   if (!user) return <Navigate to="/login" replace />;
@@ -22,7 +22,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 // Public route wrapper
-const PublicRoute = ({ children }) => {
+const PublicRoute = ({ children }: React.PropsWithChildren) => {
   const user = useAppSelector((state) => state.auth.user);
   
   if (user) return <Navigate to="/" replace />;
@@ -32,6 +32,7 @@ const PublicRoute = ({ children }) => {
 // App content with Redux
 const AppContent = () => {
   const dispatch = useAppDispatch();
+  const notifications = useAppSelector((state) => state.notifications?.notifications || []);
   
   useEffect(() => {
     dispatch(checkSession());
@@ -40,6 +41,11 @@ const AppContent = () => {
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
+      <NotificationsSystem 
+        notifications={notifications} 
+        theme={atalhoTheme}
+        dismissNotification={(id) => dispatch(dismissNotification(id))}
+      />
       <Routes>
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/" element={<ProtectedRoute>

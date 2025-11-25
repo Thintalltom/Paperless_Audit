@@ -1,5 +1,5 @@
 {
-  "name": "magic-patterns-vite-template",
+  "name": "paperless_audit",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -19,6 +19,7 @@
     "react-icons": "^5.5.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^6.26.2",
+    "reapop": "^4.3.0",
     "redux-persist": "^6.0.0",
     "sonner": "^2.0.1"
   },

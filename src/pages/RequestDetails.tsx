@@ -7,9 +7,9 @@ const RequestDetails = () => {
   const { requestId } = useParams();
   const user = useAppSelector((state) => state.auth.user);
   
-  const getApprovalChain = async () => {
+  const getApprovalChain = async (requestData) => {
     const APPROVAL_CHAIN = [
-      'branch_auditor', 'regional_manager', 'ho_admin', 'ho_auditor', 
+      'branch-approver', 'ho_admin', 'ho_auditor', 
       'account_unit', 'dd_operations', 'dd_finance', 'ged'
     ];
     
@@ -19,6 +19,20 @@ const RequestDetails = () => {
       .in('role', APPROVAL_CHAIN);
 
     if (error) return [];
+
+    // If request has branch_approver_id, get that specific approver
+    if (requestData?.branch_approver_id) {
+      const branchApprover = data.find(approver => 
+        approver.role === 'branch-approver' && approver.id === requestData.branch_approver_id
+      );
+      
+      const otherApprovers = data.filter(approver => approver.role !== 'branch-approver');
+      const allApprovers = branchApprover ? [branchApprover, ...otherApprovers] : otherApprovers;
+      
+      return allApprovers.sort((a, b) => 
+        APPROVAL_CHAIN.indexOf(a.role) - APPROVAL_CHAIN.indexOf(b.role)
+      );
+    }
 
     return data.sort((a, b) => 
       APPROVAL_CHAIN.indexOf(a.role) - APPROVAL_CHAIN.indexOf(b.role)
@@ -40,11 +54,7 @@ const RequestDetails = () => {
       if (!requestId) return;
       
       try {
-        // Fetch approval chain
-        const chain = await getApprovalChain();
-        setApprovalChain(chain);
-        
-        // Fetch request details
+        // Fetch request details first
         console.log('Fetching request with ID:', requestId);
         const { data, error } = await supabase
           .from('Request_table')
@@ -54,7 +64,13 @@ const RequestDetails = () => {
         if (error) {
           console.error('Error fetching request:', error);
         } else if (data && data.length > 0) {
-          setRequest(data[0]);
+          const requestData = data[0];
+          setRequest(requestData);
+          
+          // Fetch approval chain for this specific request
+          const chain = await getApprovalChain(requestData);
+          setApprovalChain(chain);
+          
           if (data.length > 1) {
             console.warn(`Found ${data.length} records with ID ${requestId}, using the first one`);
           }
@@ -326,7 +342,8 @@ const RequestDetails = () => {
         alert('Failed to delete request');
       } else {
         alert('Request deleted successfully');
-        navigate('/');
+        // Force navigation with state to trigger refresh
+        navigate('/', { replace: true, state: { refresh: Date.now() } });
       }
     } catch (err) {
       console.error('Error:', err);
@@ -345,19 +362,28 @@ const RequestDetails = () => {
     }));
   };
   const handleDownload = attachment => {
-    // Create a text file with attachment info since actual files aren't stored
-    const content = `Attachment: ${attachment.name}\nSize: ${(attachment.size / 1024).toFixed(1)} KB\nType: ${attachment.type}`;
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${attachment.name}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    alert(`Downloaded ${attachment.name} info`);
+    try {
+      // Decode base64 content to binary
+      const binaryString = atob(attachment.content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Create blob with actual file content
+      const blob = new Blob([bytes], { type: attachment.type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      alert('Error downloading file');
+    }
   };
   const formatDate = dateString => {
     return new Date(dateString).toLocaleDateString('en-US', {
