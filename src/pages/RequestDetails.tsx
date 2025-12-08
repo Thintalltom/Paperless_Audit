@@ -9,8 +9,8 @@ const RequestDetails = () => {
   
   const getApprovalChain = async (requestData) => {
     const APPROVAL_CHAIN = [
-      'branch-approver', 'ho_admin', 'ho_auditor', 
-      'account_unit', 'dd_operations', 'dd_finance', 'ged'
+      'branch-approver', 'dd_operations', 'Admin', 'b_auditor', 'ho_auditor',  
+      'account_unit',  'dd_finance', 'ged'
     ];
     
     const { data, error } = await supabase

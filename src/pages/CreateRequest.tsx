@@ -10,7 +10,7 @@ const CreateRequest = () => {
 
   const getApprovalChain = async () => {
     const APPROVAL_CHAIN = [
-      'branch-approver', 'Admin',  'dd_operations',  'ho_auditor', 
+      'branch-approver', 'dd_operations', 'Admin', 'b_auditor', 'dd_operations',  'ho_auditor', 
       'account_unit', 'dd_finance', 'ged'
     ];
     
