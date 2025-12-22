@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { loginUser, clearError } from '../store/authSlice';
+import { loginUser, clearError, checkSession } from '../store/authSlice';
+import { supabase } from '../supabaseClient';
 import { LockIcon, UserIcon } from 'lucide-react';
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -30,10 +31,87 @@ const LoginPage = () => {
     }
     
     try {
-      await dispatch(loginUser({ email, password })).unwrap();
+      const res: any = await dispatch(loginUser({ email, password })).unwrap();
+
+      // If the account requires a password change, show the change-password prompt
+      if (res?.forcePasswordChange) {
+        setShowChangePassword(true);
+        return;
+      }
+
       navigate('/');
     } catch (err) {
       // Error is handled by Redux
+    }
+  };
+
+  // Change password modal states
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changePwdError, setChangePwdError] = useState('');
+  const [changing, setChanging] = useState(false);
+
+  const handleChangePassword = async () => {
+    setChangePwdError('');
+    if (!oldPassword || !newPassword) {
+      setChangePwdError('Please provide both old and new passwords');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePwdError('New passwords do not match');
+      return;
+    }
+
+    try {
+      setChanging(true);
+
+      // Verify old password by attempting sign-in
+      const { error: signInOldError } = await supabase.auth.signInWithPassword({
+        email,
+        password: oldPassword,
+      });
+
+      if (signInOldError) {
+        setChangePwdError('Old password is incorrect');
+        setChanging(false);
+        return;
+      }
+
+      // Update the user's password and clear the force flag in user metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { forcePasswordChange: false },
+      });
+
+      if (updateError) {
+        // Show detailed error (e.g., weak password) when available
+        setChangePwdError(updateError.message || 'Failed to update password');
+        setChanging(false);
+        return;
+      }
+
+      // Re-authenticate with the new password to refresh tokens & metadata
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: newPassword,
+      });
+
+      if (signInError) {
+        setChangePwdError(signInError.message || 'Password updated but failed to re-authenticate. Please sign in again.');
+        setChanging(false);
+        return;
+      }
+
+      // Refresh session/profile and navigate
+      await dispatch(checkSession());
+      setShowChangePassword(false);
+      navigate('/');
+    } catch (err: any) {
+      setChangePwdError(err?.message || 'Failed to change password');
+    } finally {
+      setChanging(false);
     }
   };
   return <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -89,6 +167,25 @@ const LoginPage = () => {
             </button>
           </div>
         </form>
+
+        {/* Change password modal */}
+        {showChangePassword && <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="absolute inset-0 bg-black opacity-50" onClick={() => setShowChangePassword(false)} />
+            <div className="relative bg-white rounded-lg shadow-lg p-6 w-full max-w-md z-10">
+              <h3 className="text-lg font-medium text-gray-900">Change your password</h3>
+              <p className="text-sm text-gray-600 mt-1">For security, please change the temporary password provided to you.</p>
+              {changePwdError && <div className="bg-red-50 text-red-500 p-2 rounded mt-3 text-sm">{changePwdError}</div>}
+              <div className="mt-4 space-y-3">
+                <input type="password" placeholder="Old password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} className="w-full px-3 py-2 border rounded" />
+                <input type="password" placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-3 py-2 border rounded" />
+                <input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-3 py-2 border rounded" />
+              </div>
+              <div className="mt-4 flex justify-end space-x-2">
+                <button type="button" onClick={() => setShowChangePassword(false)} className="px-4 py-2 rounded border">Cancel</button>
+                <button type="button" onClick={handleChangePassword} disabled={changing} className="px-4 py-2 rounded bg-blue-600 text-white">{changing ? 'Updating...' : 'Update password'}</button>
+              </div>
+            </div>
+          </div>}
       </div>
     </div>;
 };

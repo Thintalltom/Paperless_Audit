@@ -6,6 +6,7 @@ interface UserProfile {
   email: string;
   name: string;
   role: string;
+  forcePasswordChange?: boolean;
   created_at?: string;
 }
 
@@ -40,8 +41,10 @@ export const loginUser = createAsyncThunk(
         .select('*')
         .eq('id', data.user.id)
         .single();
-      
-      return profile;
+      // include a flag for whether the user should be forced to change password
+      const forcePasswordChange = !!data.user.user_metadata?.forcePasswordChange;
+
+      return { ...profile, forcePasswordChange };
     }
 
     throw new Error('Login failed');
@@ -61,8 +64,8 @@ export const checkSession = createAsyncThunk('auth/checkSession', async () => {
       .select('*')
       .eq('id', session.user.id)
       .single();
-    
-    return profile;
+    const forcePasswordChange = !!session.user.user_metadata?.forcePasswordChange;
+    return { ...profile, forcePasswordChange };
   }
   
   return null;
@@ -87,6 +90,13 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
+        // If the login indicates the user must change password, do not set the user in state
+        // This prevents components (like LoginPage) that redirect on user presence from navigating
+        if (action.payload && (action.payload as any).forcePasswordChange) {
+          state.error = null;
+          return;
+        }
+
         state.user = action.payload;
         state.error = null;
       })
@@ -99,6 +109,12 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(checkSession.fulfilled, (state, action) => {
+        // If the session's user metadata requires a password change, do not set user
+        if (action.payload && (action.payload as any).forcePasswordChange) {
+          state.loading = false;
+          return;
+        }
+
         state.user = action.payload;
         state.loading = false;
       });
