@@ -13,12 +13,14 @@ interface AuthState {
   user: UserProfile | null;
   loading: boolean;
   error: string | null;
+  needsPasswordChange: boolean;
 }
 
 const initialState: AuthState = {
   user: null,
   loading: false,
   error: null,
+  needsPasswordChange: false,
 };
 
 // Async thunks
@@ -29,6 +31,7 @@ export const loginUser = createAsyncThunk(
       email,
       password,
     });
+    console.log(data);
 
     if (error) {
       throw new Error(error.message);
@@ -41,7 +44,11 @@ export const loginUser = createAsyncThunk(
         .eq('id', data.user.id)
         .single();
       
-      return profile;
+      // Return both profile and user data (including metadata)
+      return {
+        profile,
+        user: data.user
+      };
     }
 
     throw new Error('Login failed');
@@ -78,6 +85,10 @@ const authSlice = createSlice({
     setUser: (state, action) => {
       state.user = action.payload;
     },
+    completePasswordChange: (state, action) => {
+      state.user = action.payload;
+      state.needsPasswordChange = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -87,7 +98,16 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.user = action.payload;
+        const needsPasswordChange = action.payload.user?.user_metadata?.needs_password_change;
+        const hasNeverChangedPassword = !action.payload.user?.user_metadata?.password_changed;
+        
+        if (needsPasswordChange || hasNeverChangedPassword) {
+          state.needsPasswordChange = true;
+          // Don't set user yet - wait for password change
+        } else {
+          state.user = action.payload.profile;
+          state.needsPasswordChange = false;
+        }
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -105,5 +125,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUser } = authSlice.actions;
+export const { clearError, setUser, completePasswordChange } = authSlice.actions;
 export default authSlice.reducer;
