@@ -94,12 +94,12 @@ const LoginPage = () => {
       if (error) {
         setError(error.message);
       } else {
+        setError('');
         alert('Password updated successfully!');
         setShowResetPassword(false);
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        setError('');
       }
     } catch (err) {
       setError('Failed to update password');
@@ -147,15 +147,21 @@ const LoginPage = () => {
         // Get the profile and complete login
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('admin_profile')
             .select('*')
             .eq('id', authUser.id)
-            .single();
+            .maybeSingle();
           
-          dispatch(completePasswordChange(profile));
+          if (profile) {
+            dispatch(completePasswordChange(profile));
+          } else {
+            // If no profile found, just navigate
+            navigate('/');
+          }
         }
         
+        setError('');
         setShowPasswordChange(false);
       }
     } catch (err) {
@@ -230,6 +236,12 @@ const LoginPage = () => {
               For security reasons, please change your password before continuing.
             </p>
             
+            {localError && (
+              <div className="bg-red-50 text-red-500 p-3 rounded-md text-sm mb-4">
+                {localError}
+              </div>
+            )}
+            
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -301,6 +313,12 @@ const LoginPage = () => {
             <p className="text-sm text-gray-600 mb-6">
               Enter your current password and new password.
             </p>
+            
+            {localError && (
+              <div className="bg-red-50 text-red-500 p-3 rounded-md text-sm mb-4">
+                {localError}
+              </div>
+            )}
             
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>

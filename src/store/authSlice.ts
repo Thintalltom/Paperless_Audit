@@ -6,6 +6,7 @@ interface UserProfile {
   email: string;
   name: string;
   role: string;
+  forcePasswordChange?: boolean;
   created_at?: string;
 }
 
@@ -68,8 +69,8 @@ export const checkSession = createAsyncThunk('auth/checkSession', async () => {
       .select('*')
       .eq('id', session.user.id)
       .single();
-    
-    return profile;
+    const forcePasswordChange = !!session.user.user_metadata?.forcePasswordChange;
+    return { ...profile, forcePasswordChange };
   }
   
   return null;
@@ -119,6 +120,12 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(checkSession.fulfilled, (state, action) => {
+        // If the session's user metadata requires a password change, do not set user
+        if (action.payload && (action.payload as any).forcePasswordChange) {
+          state.loading = false;
+          return;
+        }
+
         state.user = action.payload;
         state.loading = false;
       });
