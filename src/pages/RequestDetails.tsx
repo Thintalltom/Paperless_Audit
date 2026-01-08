@@ -55,7 +55,7 @@ const RequestDetails = () => {
       
       try {
         // Fetch request details first
-        console.log('Fetching request with ID:', requestId);
+        // console.log('Fetching request with ID:', requestId);
         const { data, error } = await supabase
           .from('Request_table')
           .select('*')
@@ -75,7 +75,7 @@ const RequestDetails = () => {
             console.warn(`Found ${data.length} records with ID ${requestId}, using the first one`);
           }
         } else {
-          console.log('No request found with ID:', requestId);
+          // console.log('No request found with ID:', requestId);
           setRequest(null);
         }
       } catch (err) {

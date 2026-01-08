@@ -1,5 +1,5 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { supabase } from '../supabaseClient';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { supabase } from "../supabaseClient";
 
 interface UserProfile {
   id: string;
@@ -26,13 +26,12 @@ const initialState: AuthState = {
 
 // Async thunks
 export const loginUser = createAsyncThunk(
-  'auth/login',
+  "auth/login",
   async ({ email, password }: { email: string; password: string }) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    console.log(data);
 
     if (error) {
       throw new Error(error.message);
@@ -40,44 +39,47 @@ export const loginUser = createAsyncThunk(
 
     if (data.user) {
       const { data: profile } = await supabase
-        .from('admin_profile')
-        .select('*')
-        .eq('id', data.user.id)
+        .from("admin_profile")
+        .select("*")
+        .eq("id", data.user.id)
         .single();
-      
+
       // Return both profile and user data (including metadata)
       return {
         profile,
-        user: data.user
+        user: data.user,
       };
     }
 
-    throw new Error('Login failed');
+    throw new Error("Login failed");
   }
 );
 
-export const logoutUser = createAsyncThunk('auth/logout', async () => {
+export const logoutUser = createAsyncThunk("auth/logout", async () => {
   await supabase.auth.signOut();
 });
 
-export const checkSession = createAsyncThunk('auth/checkSession', async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  
+export const checkSession = createAsyncThunk("auth/checkSession", async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   if (session?.user) {
     const { data: profile } = await supabase
-      .from('admin_profile')
-      .select('*')
-      .eq('id', session.user.id)
+      .from("admin_profile")
+      .select("*")
+      .eq("id", session.user.id)
       .single();
-    const forcePasswordChange = !!session.user.user_metadata?.forcePasswordChange;
+    const forcePasswordChange =
+      !!session.user.user_metadata?.forcePasswordChange;
     return { ...profile, forcePasswordChange };
   }
-  
+
   return null;
 });
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState,
   reducers: {
     clearError: (state) => {
@@ -99,9 +101,11 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        const needsPasswordChange = action.payload.user?.user_metadata?.needs_password_change;
-        const hasNeverChangedPassword = !action.payload.user?.user_metadata?.password_changed;
-        
+        const needsPasswordChange =
+          action.payload.user?.user_metadata?.needs_password_change;
+        const hasNeverChangedPassword =
+          !action.payload.user?.user_metadata?.password_changed;
+
         if (needsPasswordChange || hasNeverChangedPassword) {
           state.needsPasswordChange = true;
           // Don't set user yet - wait for password change
@@ -113,7 +117,7 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Login failed';
+        state.error = action.error.message || "Login failed";
       })
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
@@ -132,5 +136,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUser, completePasswordChange } = authSlice.actions;
+export const { clearError, setUser, completePasswordChange } =
+  authSlice.actions;
 export default authSlice.reducer;

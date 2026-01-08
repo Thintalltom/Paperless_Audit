@@ -96,16 +96,21 @@ const CreateRequest = () => {
     
     const fileObjects = await Promise.all(
       files.map(async (file) => {
-        const content = await file.arrayBuffer();
-        const base64Content = btoa(String.fromCharCode(...new Uint8Array(content)));
-        
-        return {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          content: base64Content,
-          url: URL.createObjectURL(file)
-        };
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64Content = reader.result.split(',')[1]; // Remove data:type;base64, prefix
+            
+            resolve({
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              content: base64Content,
+              url: URL.createObjectURL(file)
+            });
+          };
+          reader.readAsDataURL(file);
+        });
       })
     );
     
@@ -189,7 +194,7 @@ const CreateRequest = () => {
       // Get the assigned branch-approver for this request
       const chain = await getApprovalChain();
       const branchApprover = chain.find(approver => approver.role === 'branch-approver');
-      console.log('the branch approver', branchApprover)
+
       // Request data with approval system initialization
       const requestData = {
         initiator_name: formData.initiatorName,
@@ -331,7 +336,7 @@ const CreateRequest = () => {
                     <p className="pl-1">or drag and drop</p>
                   </div>
                   <p className="text-xs text-gray-500">
-                    PNG, JPG, PDF up to 2MB
+                  DOCX, JPG, up to 2MB
                   </p>
                 </div>
               </div>
